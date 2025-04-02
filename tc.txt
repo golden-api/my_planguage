@@ -1,0 +1,59 @@
+//h := 1 /* Initialization of the pivot row */
+//k := 1 /* Initialization of the pivot column */
+//
+//while h ≤ m and k ≤ n
+//    /* Find the k-th pivot: */
+//    i_max := argmax (i = h ... m, abs(A[i, k]))
+//    if A[i_max, k] = 0
+//        /* No pivot in this column, pass to next column */
+//        k := k + 1
+//    else
+//        swap rows(h, i_max)
+//        /* Do for all rows below pivot: */
+//        for i = h + 1 ... m:
+//            f := A[i, k] / A[h, k]
+//            /* Fill with zeros the lower part of pivot column: */
+//            A[i, k] := 0
+//            /* Do for all remaining elements in current row: */
+//            for j = k + 1 ... n:
+//                A[i, j] := A[i, j] - A[h, j] * f
+//        /* Increase pivot row and column */
+//        h := h + 1
+//        k := k + 1
+
+a:= int input();
+h := 0;
+k := 0;
+m := dimension(a) - 1;  // Number of rows - 1
+n := dimension(a[0]) - 1;  // Number of columns - 1
+while h<=m and k<=n do{
+    i_max := h;
+    if a[h,k]>=0. then max_val:= a[h,k] else max_val:=-a[h,k];
+    for i := h + 1 to m do {
+        if a[i,k]>=0. then current:= a[i,k] else current:=-a[i,k];  
+        if current > max_val then {
+            i_max := i;
+            max_val := current;
+        } else continue;
+    }done;
+    if a[i_max,k] == 0. then {
+        // No pivot in this column, move to next column
+        k := k + 1;
+    } else {
+    // Swap pivot row with current row
+        temp_row := a[h];
+        a[h]:=a[i_max];
+        a[i_max] := temp_row;
+        for i := h + 1 to m do {
+            f := a[i,k] / a[h,k];
+            a[i,k] := 0;
+            for j := k + 1 to n do {
+                a[i,j] := a[i,j] - a[h,j] * f;
+            }done;
+        }done;
+        // Move to next pivot position
+        h := h + 1;
+        k := k + 1;
+    };
+}done;
+
