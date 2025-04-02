@@ -411,8 +411,27 @@ let rec eval_expr (e : expr) (env : environment) : value =
       let read_input_source source =
         match source with
         | None ->
-            print_string "Enter expr: ";
-            read_line ()
+          (match spec with
+           | TV ->
+               print_string "Enter vector dimension: ";
+               flush stdout;
+               let dim_line = read_line () in
+               print_string "Enter vector elements (e.g., [1,2,3]): ";
+               flush stdout;
+               let data_line = read_line () in
+               dim_line ^ "\n" ^ data_line
+           | TM ->
+               print_string "Enter matrix dimensions (rows,cols): ";
+               flush stdout;
+               let dim_line = read_line () in
+               print_string "Enter matrix data (e.g., [[1,2],[3,4]]): ";
+               flush stdout;
+               let data_line = read_line () in
+               dim_line ^ "\n" ^ data_line
+           | _ ->
+               print_string "Enter value: ";
+               flush stdout;
+               read_line ())
         | Some source ->
             let ic = open_in source in
             let content = ref [] in
