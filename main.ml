@@ -3,7 +3,7 @@ open Ast
 open Typechecker
 
 let () =
-  let filename = "tc.txt" in
+  let filename = "tc.myl" in
   let in_channel = open_in filename in
   let lexbuf = Lexing.from_channel in_channel in
   try

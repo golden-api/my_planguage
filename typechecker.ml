@@ -198,9 +198,9 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | _ -> raise (TypeMismatch "Index must be integer")
       ) indices;
      ( match (t_container, List.length indices) with
-        | (Ast.V _, 1) when t_value <> Ast.Int && t_value <> Ast.Float ->   raise (TypeMismatch "Vector element type must be int/float")
+        | (Ast.V _, 1) when t_value <> Ast.Float ->   raise (TypeMismatch "Vector element type must be float")
         | (Ast.V _, 1) -> t_value
-        | (Ast.M _, 2) when t_value <> Ast.Int && t_value <> Ast.Float ->   raise (TypeMismatch "Matrix element type must be int/float")
+        | (Ast.M _, 2) when t_value <> Ast.Float ->   raise (TypeMismatch "Matrix element type must be float")
         | (Ast.M _, 2) -> t_value
         | (Ast.M _, 1) ->   (match t_value with
              | Ast.V _ -> t_value   | _ -> raise (TypeMismatch "Matrix element type must be vector"))
