@@ -34,6 +34,8 @@ let magnitude v =
   | VectorV (_, vs) ->
       let sum_sq = List.fold_left (fun acc x -> let f = to_float x in acc +. (f *. f) ) 0.0 vs in
       FloatV (sqrt sum_sq)
+  | IntV v -> FloatV(sqrt(float_of_int v))
+  | FloatV v -> FloatV(sqrt(v))
   | _ -> failwith "magnitude: expects a vector"
 
 let angle_between v1 v2 =
@@ -52,6 +54,7 @@ let transpose v =
           else  let heads = List.map List.hd mat in let tails = List.map List.tl mat in
           heads :: aux tails
       in  MatrixV (m, n, aux rows)
+  | VectorV ( n, vs) -> MatrixV (n, 1, List.map (fun x -> [x]) vs)
   | _ -> failwith "transpose: expects a matrix"
 
 let determinant v =
@@ -62,7 +65,7 @@ let determinant v =
         let sign = ref 1.0 in
         for i = 0 to n - 1 do
           if a.(i).(i) = 0.0 then (
-            let rec find_swap j =if j >= n then failwith "determinant: matrix is singular"
+            let rec find_swap j =if j >= n then 0
               else if a.(j).(i) <> 0.0 then j else find_swap (j+1)
             in let j = find_swap (i+1) in  let temp = a.(i) in
             a.(i) <- a.(j); a.(j) <- temp; sign := !sign *. -1.0
@@ -228,12 +231,14 @@ let rec eval_expr (e : expr) (env : environment) : value =
           | (BoolV b1, BoolV b2) -> BoolV (b1 && b2)
           | (MatrixV (n, m, m1), MatrixV (p, q, m2)) ->
             if m <> p then raise (DimensionError "Matrix multiplication: incompatible dimensions");
-            let result = List.map (fun row -> List.map (fun _ -> FloatV 0.0) (List.hd m2)) m1 in
-            let compute_mult row col =List.fold_left2 (fun acc x y -> match (x, y) with
-                | (FloatV f1, FloatV f2) -> acc +. (f1 *. f2) | _ -> failwith "Matrix multiplication error: Elements must be FloatV"
-              ) 0.0 row col in
-            MatrixV (n, q, List.mapi (fun i row -> List.mapi (fun j _ -> FloatV (compute_mult row (List.map (fun r -> List.nth r j) m2))) row) result)
-          | _ -> failwith "Multiplication: not defined for these types")
+            let compute_row row = List.init q (fun j ->let column = List.map (fun r -> List.nth r j) m2 in
+                FloatV (List.fold_left2 (fun acc x y ->
+                  match (x, y) with
+                  | (FloatV f1, FloatV f2) -> acc +. (f1 *. f2)
+                  | _ -> failwith "Matrix multiplication error: Elements must be FloatV"
+                ) 0.0 row column))
+            in  MatrixV (n, q, List.map compute_row m1)
+           | _ -> failwith "Multiplication: not defined for these types")
       | Div ->
           (match (v1, v2) with
           | (VectorV (n,v), IntV i) when i <> 0 -> VectorV (n, List.map (function | FloatV x -> FloatV (x /. float_of_int i)  | _ -> failwith "Division error: Vector contains non-float elements") v)

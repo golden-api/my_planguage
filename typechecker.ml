@@ -57,16 +57,16 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           (match t1, t2 with
           | Ast.Int, Ast.Int -> Ast.Int
           | Ast.Float, Ast.Float -> Ast.Float
-          | Ast.V n1, Ast.V n2 when n1 = n2 -> Ast.V n1
-          | Ast.M (m1, n1), Ast.M (m2, n2) when m1 = m2 && n1 = n2 -> Ast.M (m1, n1)
+          | Ast.V _, Ast.V _  -> Ast.V 0
+          | Ast.M _, Ast.M _ -> Ast.M (0,0)
           | Ast.B, Ast.B -> Ast.B
           | _ -> raise (TypeMismatch "Addition requires operands of compatible types"))
       | Ast.Sub ->
           (match t1, t2 with
           | Ast.Int, Ast.Int -> Ast.Int
           | Ast.Float, Ast.Float -> Ast.Float
-          | Ast.V n1, Ast.V n2 when n1 = n2 -> Ast.V n1
-          | Ast.M (m1, n1), Ast.M (m2, n2) when m1 = m2 && n1 = n2 -> Ast.M (m1, n1)
+          | Ast.V _, Ast.V _  -> Ast.V 0
+          | Ast.M _, Ast.M _  -> Ast.M (0,0)
           | _ -> raise (TypeMismatch "Subtraction requires operands of compatible types"))
       | Ast.Mul ->
           (match t1, t2 with
@@ -77,6 +77,7 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | (Ast.Int | Ast.Float), Ast.V n -> Ast.V n
           | Ast.M (m, n), (Ast.Int | Ast.Float) -> Ast.M (m, n)
           | (Ast.Int | Ast.Float), Ast.M (m, n) -> Ast.M (m, n)
+          | Ast.M _, Ast.M _ -> Ast.M (0,0)
           | _ -> raise (TypeMismatch "Multiplication requires operands of compatible types"))
       | Ast.Div ->
           (match t1, t2 with
@@ -107,12 +108,12 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           else raise (TypeMismatch "Equality requires matching types")
       | Ast.Dot ->
           (match t1, t2 with
-          | Ast.V n1, Ast.V n2 when n1 = n2 -> Ast.Float
-          | _ -> raise (TypeMismatch "Dot product requires two vectors of the same dimension"))
+          | Ast.V _, Ast.V _ -> Ast.Float
+          | _ -> raise (TypeMismatch "Dot product requires two vectors"))
       | Ast.Angle ->
           (match t1, t2 with
-          | Ast.V n1, Ast.V n2 when n1 = n2 -> Ast.Float
-          | _ -> raise (TypeMismatch "Angle operator requires two vectors of the same dimension"))
+          | Ast.V _, Ast.V _ -> Ast.Float
+          | _ -> raise (TypeMismatch "Angle operator requires two vectors"))
       )
   | Ast.UnOp (op, e1) ->
       let t = type_of_expr env e1 in
@@ -128,7 +129,7 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           else raise (TypeMismatch "Not operator requires a boolean type")
       | Ast.Magnitude ->
           (match t with
-          | Ast.V _ -> Ast.Float
+          | Ast.V _ | Ast.Int | Ast.Float-> Ast.Float
           | _ -> raise (TypeMismatch "Magnitude requires a vector"))
       | Ast.Dimension ->
           (match t with
@@ -137,6 +138,7 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
       | Ast.Transpose ->
           (match t with
           | Ast.M (m, n) -> Ast.M (n, m)
+          | Ast.V (n) -> Ast.M(n,1)
           | _ -> raise (TypeMismatch "Transpose requires a matrix"))
       | Ast.Determinant ->
           (match t with
@@ -147,16 +149,19 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | Ast.M (m, n) when m = n -> Ast.M (m, n)
           | _ -> raise (TypeMismatch "Inverse requires a square matrix"))
       )
-  | Ast.Assign (s, e1) ->
-      let t1 = type_of_expr env e1 in
-      (try
-         let t_var = Hashtbl.find env s in
-         if t1 = t_var then t1
-         else raise (TypeMismatch ("Assignment type mismatch for variable " ^ s))
-       with Not_found ->
-         Hashtbl.add env s t1;
-         t1
-      )
+      | Ast.Assign (s, e1) ->
+        let t1 = type_of_expr env e1 in
+        (try  let t_var = Hashtbl.find env s in
+           match (t1, t_var) with
+           | (Ast.V (n1), Ast.V (n2)) ->
+               if (n1!=0 && n2!=0 && n1 <> n2) then
+                 raise (TypeMismatch ("Assignment type mismatch for variable " ^ s))    else t1
+           | (Ast.M (r1, c1), Ast.M (r2, c2)) ->
+               if (r1!=0 && r2!=0 && r1 <> r2 || c1 <> c2)  then
+                 raise (TypeMismatch ("Assignment type mismatch for variable " ^ s))    else t1
+           | _ when t1 = t_var -> t1 
+           | _ -> raise (TypeMismatch ("Assignment type mismatch for variable " ^ s))  with Not_found ->Hashtbl.add env s t1; 
+         t1)    
   | Ast.Input (spec, _) ->
       (match spec with
       | TInt -> Ast.Int
@@ -192,24 +197,15 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | Ast.Int -> ()
           | _ -> raise (TypeMismatch "Index must be integer")
       ) indices;
-      (match t_container with
-      | Ast.V _ when List.length indices = 1 ->
-          if t_value <> Ast.Int && t_value <> Ast.Float then
-              raise (TypeMismatch "Vector element type must be int/float")
-          else t_value
-      | Ast.M _ when List.length indices = 2 ->
-          if t_value <> Ast.Int && t_value <> Ast.Float then
-              raise (TypeMismatch "Matrix element type must be int/float")
-          else  t_value
-      | Ast.M _ when List.length indices = 2 ->
-          if t_value <> Ast.Int && t_value <> Ast.Float then
-              raise (TypeMismatch "Matrix element type must be int/float")
-          else  t_value
-      | Ast.M _ when List.length indices = 1 ->
-          if t_value <> Ast.V (0)  then
-              raise (TypeMismatch "Matrix element type must be vector")
-          else  t_value
-      | _ -> raise (TypeMismatch "Invalid indexing or non-vector/matrix assignment"))
+     ( match (t_container, List.length indices) with
+        | (Ast.V _, 1) when t_value <> Ast.Int && t_value <> Ast.Float ->   raise (TypeMismatch "Vector element type must be int/float")
+        | (Ast.V _, 1) -> t_value
+        | (Ast.M _, 2) when t_value <> Ast.Int && t_value <> Ast.Float ->   raise (TypeMismatch "Matrix element type must be int/float")
+        | (Ast.M _, 2) -> t_value
+        | (Ast.M _, 1) ->   (match t_value with
+             | Ast.V _ -> t_value   | _ -> raise (TypeMismatch "Matrix element type must be vector"))
+        | _ -> raise (TypeMismatch "Invalid container/index combination"))
+   
   | _ -> raise (TypeError "Invalid expression")
 
 let rec check_statement (env : env) (s : Ast.statement) : unit =

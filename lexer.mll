@@ -32,6 +32,8 @@ rule token = parse
 | ['a'-'z' 'A'-'Z' '0'-'9' '_' '-']+ ".txt" as s { FILE s }
 | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as id { IDENT id }
 | ['0'-'9']+                        { INT (int_of_string (Lexing.lexeme lexbuf)) }
-| ['0'-'9']+ '.' ['0'-'9']*          { FLOAT (float_of_string (Lexing.lexeme lexbuf)) }
+| ['0'-'9']+ '.' ['0'-'9']* (['e' 'E'] ['+' '-']? ['0'-'9']+)? as f { FLOAT (float_of_string f) }
+| ['0'-'9']+ ['e' 'E'] ['+' '-']? ['0'-'9']+ as f { FLOAT (float_of_string f) }
+| '.' ['0'-'9']+ (['e' 'E'] ['+' '-']? ['0'-'9']+)? as f { FLOAT (float_of_string f) }
 | eof                                { EOF }
 | _                                  {  raise (LexerError ("Unexpected character: " ^ Lexing.lexeme lexbuf)) }
