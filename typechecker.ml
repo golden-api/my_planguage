@@ -7,13 +7,11 @@ type env = (string, Ast.typ) Hashtbl.t
 
 let empty_env () = Hashtbl.create 20
 
-(* Typecheck an expression *)
 let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
   match e with
   | Ast.ConstBool _ -> Ast.B
   | Ast.ConstInt _ -> Ast.Int
   | Ast.ConstFloat _ -> Ast.Float
-
   | Ast.ConstV es ->
       (match es with
       | [] -> raise (TypeMismatch "Empty vector literal")
@@ -28,7 +26,6 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | Ast.Int | Ast.Float -> Ast.V (List.length es)
           | _ -> raise (TypeMismatch "Vector elements must be numeric"))
       )
-
   | Ast.ConstM rows ->
       (match rows with
       | [] -> raise (TypeMismatch "Empty matrix literal")
@@ -50,10 +47,8 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
             Ast.M (List.length rows, row_len)
           )
       )
-
   | Ast.Var s ->
       (try Hashtbl.find env s with Not_found -> raise (UndefinedVariable s))
-
   | Ast.BinOp (e1, op, e2) ->
       let t1 = type_of_expr env e1 in
       let t2 = type_of_expr env e2 in
@@ -119,7 +114,6 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | Ast.V n1, Ast.V n2 when n1 = n2 -> Ast.Float
           | _ -> raise (TypeMismatch "Angle operator requires two vectors of the same dimension"))
       )
-
   | Ast.UnOp (op, e1) ->
       let t = type_of_expr env e1 in
       (match op with
@@ -153,7 +147,6 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
           | Ast.M (m, n) when m = n -> Ast.M (m, n)
           | _ -> raise (TypeMismatch "Inverse requires a square matrix"))
       )
-
   | Ast.Assign (s, e1) ->
       let t1 = type_of_expr env e1 in
       (try
@@ -164,7 +157,6 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
          Hashtbl.add env s t1;
          t1
       )
-
   | Ast.Input (spec, _) ->
       (match spec with
       | TInt -> Ast.Int
@@ -173,7 +165,6 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
       | TV -> Ast.V 0
       | TM -> Ast.M (0, 0)
       )
-
   | Ast.Index (target, indices) ->
       let target_type = type_of_expr env target in
       List.iter (fun t ->
@@ -195,52 +186,32 @@ let rec type_of_expr (env : env) (e : Ast.expr) : Ast.typ =
       | _ ->
           raise (TypeError "Indexing only allowed on vectors/matrices")
       )
-
-    | Ast.AssignIdx (Ast.Index (Ast.Var s, indices), e1) ->
-        let t_container = Hashtbl.find env s in let t_value = type_of_expr env e1 in
-        List.iter (fun idx ->   match type_of_expr env idx with
-            | Ast.Int -> ()
-            | _ -> raise (TypeMismatch "Index must be integer")
-        ) indices;
-        (match t_container with
-        | Ast.V _ when List.length indices = 1 ->
-            if t_value <> Ast.Int && t_value <> Ast.Float then
-                raise (TypeMismatch "Vector element type must be int/float")
-            else t_value
-        | Ast.M _ when List.length indices = 2 ->
-            if t_value <> Ast.Int && t_value <> Ast.Float then
-                raise (TypeMismatch "Matrix element type must be int/float")
-            else  t_value
-        | Ast.M _ when List.length indices = 2 ->
-            if t_value <> Ast.Int && t_value <> Ast.Float then
-                raise (TypeMismatch "Matrix element type must be int/float")
-            else  t_value
-        | Ast.M _ when List.length indices = 1 ->
-            if t_value <> Ast.V (0)  then
-                raise (TypeMismatch "Matrix element type must be vector")
-            else  t_value
-        | _ -> raise (TypeMismatch "Invalid indexing or non-vector/matrix assignment"))
-    
+  | Ast.AssignIdx (Ast.Index (Ast.Var s, indices), e1) ->
+      let t_container = Hashtbl.find env s in let t_value = type_of_expr env e1 in
+      List.iter (fun idx ->   match type_of_expr env idx with
+          | Ast.Int -> ()
+          | _ -> raise (TypeMismatch "Index must be integer")
+      ) indices;
+      (match t_container with
+      | Ast.V _ when List.length indices = 1 ->
+          if t_value <> Ast.Int && t_value <> Ast.Float then
+              raise (TypeMismatch "Vector element type must be int/float")
+          else t_value
+      | Ast.M _ when List.length indices = 2 ->
+          if t_value <> Ast.Int && t_value <> Ast.Float then
+              raise (TypeMismatch "Matrix element type must be int/float")
+          else  t_value
+      | Ast.M _ when List.length indices = 2 ->
+          if t_value <> Ast.Int && t_value <> Ast.Float then
+              raise (TypeMismatch "Matrix element type must be int/float")
+          else  t_value
+      | Ast.M _ when List.length indices = 1 ->
+          if t_value <> Ast.V (0)  then
+              raise (TypeMismatch "Matrix element type must be vector")
+          else  t_value
+      | _ -> raise (TypeMismatch "Invalid indexing or non-vector/matrix assignment"))
   | _ -> raise (TypeError "Invalid expression")
 
-
-(* Helper to check numeric types *)
-let check_numeric t =
-    match t with
-    | Ast.Int | Ast.Float -> ()
-    | _ -> raise (TypeMismatch "Expected a numeric type")
-
-(* Helper for binary operations on numeric operands *)
-let binop_numeric env e1 e2 op_name =
-    let t1 = type_of_expr env e1 in
-    let t2 = type_of_expr env e2 in
-    check_numeric t1; check_numeric t2;
-    match t1, t2 with
-    | Ast.Int, Ast.Int -> Ast.Int
-    | Ast.Float, Ast.Float -> Ast.Float
-    | _ -> raise (TypeMismatch (op_name ^ " requires numeric operands"))
-  
-(* Check statements in the AST *)
 let rec check_statement (env : env) (s : Ast.statement) : unit =
   match s with
   | Ast.Expr e ->
